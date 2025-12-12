@@ -64,6 +64,215 @@ async function mergePdfs(mainPdfBuffer, additionalPdfBuffers) {
   }
 }
 
+/**
+ * Transforms the array-based test category payload into the flat object format
+ * expected by createPdfDocDefinition
+ * @param {Array} testCategories - Array of test categories with data
+ * @param {Object} patientInfo - Patient information (name, age, dob, gender, reportDate)
+ * @returns {Object} Transformed data object
+ */
+function transformPayload(testCategories, patientInfo = {}) {
+  const result = {
+    patientName: patientInfo.patientName || "",
+    age: patientInfo.age || "",
+    dob: patientInfo.dob || "",
+    gender: patientInfo.gender || "",
+    reportDate: patientInfo.reportDate || "",
+  };
+  
+  // Helper function to find a test by name within a category
+  function findTest(categoryCode, testName) {
+    const category = testCategories.find(c => c.test_category_code === categoryCode);
+    if (!category || !category.data) return null;
+    return category.data.find(t => t.name.toLowerCase() === testName.toLowerCase());
+  }
+  
+  // Helper function to find a test by name across all categories
+  function findTestAny(testName) {
+    for (const category of testCategories) {
+      if (!category.data) continue;
+      const test = category.data.find(t => t.name.toLowerCase() === testName.toLowerCase());
+      if (test) return test;
+    }
+    return null;
+  }
+  
+  // General Health Checkup (HC)
+  const heightTest = findTest("HC", "Height");
+  if (heightTest) result.height = `${heightTest.value} ${heightTest.unit || ""}`.trim();
+  
+  const weightTest = findTest("HC", "Weight");
+  if (weightTest) result.weight = `${weightTest.value} ${weightTest.unit || ""}`.trim();
+  
+  const bmiTest = findTest("HC", "BMI");
+  if (bmiTest) result.bmi = bmiTest.value;
+  
+  const healthScoreTest = findTest("HC", "Health Score");
+  if (healthScoreTest) result.healthScore = healthScoreTest.value;
+  
+  const bmrTest = findTest("HC", "BMR");
+  if (bmrTest) result.bmr = { value: `${bmrTest.value} ${bmrTest.unit || ""}`.trim(), status: bmrTest.result || "" };
+  
+  const pulseTest = findTest("HC", "BP Pulse");
+  if (pulseTest) result.pulse = { value: `${pulseTest.value} ${pulseTest.unit || ""}`.trim(), status: pulseTest.result || "" };
+  
+  const proteinTest = findTest("HC", "Protein");
+  if (proteinTest) result.protein = { value: `${proteinTest.value} ${proteinTest.unit || ""}`.trim(), status: proteinTest.result || "" };
+  
+  const bodyFatTest = findTest("HC", "Body Fat");
+  if (bodyFatTest) result.bodyFat = { value: `${bodyFatTest.value} ${bodyFatTest.unit || ""}`.trim(), status: bodyFatTest.result || "" };
+  
+  const metaAgeTest = findTest("HC", "Meta Age");
+  if (metaAgeTest) result.metabolicAge = { value: `${metaAgeTest.value} ${metaAgeTest.unit || ""}`.trim(), status: metaAgeTest.result || "" };
+  
+  const boneMassTest = findTest("HC", "Bone Mass");
+  if (boneMassTest) result.boneMass = { value: `${boneMassTest.value} ${boneMassTest.unit || ""}`.trim(), status: boneMassTest.result || "" };
+  
+  const bodyWaterTest = findTest("HC", "Body Water");
+  if (bodyWaterTest) result.bodyWater = { value: `${bodyWaterTest.value} ${bodyWaterTest.unit || ""}`.trim(), status: bodyWaterTest.result || "" };
+  
+  const muscleMassTest = findTest("HC", "Muscle Mass");
+  if (muscleMassTest) result.muscleMass = { value: `${muscleMassTest.value} ${muscleMassTest.unit || ""}`.trim(), status: muscleMassTest.result || "" };
+  
+  const visceralFatTest = findTest("HC", "Visceral Fat");
+  if (visceralFatTest) result.visceralFat = { value: `${visceralFatTest.value} ${visceralFatTest.unit || ""}`.trim(), status: visceralFatTest.result || "" };
+  
+  const skeletalMuscleTest = findTest("HC", "Skeletal Muscle");
+  if (skeletalMuscleTest) result.skeletalMuscle = { value: `${skeletalMuscleTest.value} ${skeletalMuscleTest.unit || ""}`.trim(), status: skeletalMuscleTest.result || "" };
+  
+  const subcutaneousFatTest = findTest("HC", "Subcutaneous Fat");
+  if (subcutaneousFatTest) result.subcutaneousFat = { value: `${subcutaneousFatTest.value} ${subcutaneousFatTest.unit || ""}`.trim(), status: subcutaneousFatTest.result || "" };
+  
+  const bloodOxygenTest = findTest("HC", "Blood Oxygen");
+  if (bloodOxygenTest) result.oxygenSaturation = { value: `${bloodOxygenTest.value} ${bloodOxygenTest.unit || ""}`.trim(), status: bloodOxygenTest.result || "" };
+  
+  const bodyTempTest = findTest("HC", "Body Temp");
+  if (bodyTempTest) result.bodyTemperature = { value: `${bodyTempTest.value} ${bodyTempTest.unit || ""}`.trim(), status: bodyTempTest.result || "" };
+  
+  const systolicTest = findTest("HC", "Systolic");
+  if (systolicTest) result.bpSystolic = { value: `${systolicTest.value} ${systolicTest.unit || ""}`.trim(), status: systolicTest.result || "" };
+  
+  const diastolicTest = findTest("HC", "Diastolic");
+  if (diastolicTest) result.bpDiastolic = { value: `${diastolicTest.value} ${diastolicTest.unit || ""}`.trim(), status: diastolicTest.result || "" };
+  
+  // Vision (VI)
+  const leftEyeTest = findTest("VI", "Left Eye");
+  if (leftEyeTest) result.leftEye = { value: leftEyeTest.value || "", status: leftEyeTest.result || "" };
+  
+  const rightEyeTest = findTest("VI", "Right Eye");
+  if (rightEyeTest) result.rightEye = { value: rightEyeTest.value || "", status: rightEyeTest.result || "" };
+  
+  const colorVisionTest = findTest("VI", "Color Vision");
+  if (colorVisionTest) result.colorVision = { value: colorVisionTest.value || "", status: colorVisionTest.result || "" };
+  
+  // Anemia (AN)
+  const hemoglobinTest = findTest("AN", "hemoglobin");
+  if (hemoglobinTest) result.hemoglobin = { value: `${hemoglobinTest.value} ${hemoglobinTest.unit || ""}`.trim(), status: hemoglobinTest.result || "" };
+  
+  // Diabetic Care (DC)
+  const glucoseTest = findTest("DC", "Blood Sugar ( Post Prandial )") || findTest("DC", "Blood Sugar");
+  if (glucoseTest) result.glucose = { value: `${glucoseTest.value} ${glucoseTest.unit || ""}`.trim(), status: glucoseTest.result || "" };
+  
+  const hba1cTest = findTest("DC", "HbA1c");
+  if (hba1cTest) result.hba1c = { value: `${hba1cTest.value} ${hba1cTest.unit || ""}`.trim(), status: hba1cTest.result || "" };
+  
+  // Cardiac Care (CC) - ECG PDF
+  const ecgCategory = testCategories.find(c => c.test_category_code === "CC");
+  if (ecgCategory && ecgCategory.data) {
+    const ecgTest = ecgCategory.data.find(t => t.media && t.media.type === "pdf");
+    if (ecgTest && ecgTest.media && ecgTest.media.link) {
+      result.ecgPdfUrl = ecgTest.media.link.startsWith("http") 
+        ? ecgTest.media.link 
+        : `https://prod.clinicsoncloud.co/api/v3/${ecgTest.media.link}`;
+    }
+  }
+  
+  // Lung Examination (LE) - Spirometer
+  const lungCategory = testCategories.find(c => c.test_category_code === "LE");
+  if (lungCategory && lungCategory.data && lungCategory.data.length > 0) {
+    const fvcTest = findTest("LE", "FVC");
+    const pefTest = findTest("LE", "PEF");
+    const fev1Test = findTest("LE", "FEV1");
+    const fevFvcTest = findTest("LE", "FEV/FVC");
+    
+    if (fvcTest || pefTest || fev1Test || fevFvcTest) {
+      result.spirometerTest = {
+        diagnosis: "", // Will need to be determined based on values
+        fvc: fvcTest ? { predictivePercent: fvcTest.range || "", predictiveValue: fvcTest.result || "", measuredValue: fvcTest.value || "" } : {},
+        pef: pefTest ? { predictivePercent: pefTest.range || "", predictiveValue: pefTest.result || "", measuredValue: pefTest.value || "" } : {},
+        fev1: fev1Test ? { predictivePercent: fev1Test.range || "", predictiveValue: fev1Test.result || "", measuredValue: fev1Test.value || "" } : {},
+        fev1Fvc: fevFvcTest ? { predictivePercent: fevFvcTest.range || "", predictiveValue: fevFvcTest.result || "", measuredValue: fevFvcTest.value || "" } : {},
+      };
+    }
+    
+    // Check for spirometer report PDF
+    const spiroReportTest = lungCategory.data.find(t => t.media && t.media.type === "pdf");
+    if (spiroReportTest && spiroReportTest.media && spiroReportTest.media.link) {
+      result.labReportPdfUrl = spiroReportTest.media.link.startsWith("http")
+        ? spiroReportTest.media.link
+        : `https://prod.clinicsoncloud.co/api/v3${spiroReportTest.media.link}`;
+    }
+  }
+  
+  // Uric Acid (UA)
+  const uricAcidTest = findTest("UA", "Uric Acid Test");
+  if (uricAcidTest) result.uricAcid = { value: `${uricAcidTest.value} ${uricAcidTest.unit || ""}`.trim(), status: uricAcidTest.result || "" };
+  
+  // Stress and Fatigue (SF)
+  const pssTest = findTest("SF", "PSS") || findTest("SF", "Perceived Stress");
+  if (pssTest) result.perceivedStress = { value: pssTest.value || "", status: pssTest.result || "" };
+  
+  const fasTest = findTest("SF", "FAS") || findTest("SF", "Fatigue");
+  if (fasTest) result.fatigueAssessment = { value: fasTest.value || "", status: fasTest.result || "" };
+  
+  // Mental Health (MH)
+  const depressionTest = findTest("MH", "Depression") || findTest("MH", "PHQ-9");
+  const anxietyTest = findTest("MH", "Anxiety") || findTest("MH", "GAD-7");
+  if (depressionTest || anxietyTest) {
+    result.mentalHealth = {
+      depression: depressionTest ? depressionTest.result || "" : "",
+      anxiety: anxietyTest ? anxietyTest.result || "" : "",
+    };
+  }
+  
+  // Ayurvedic (AY)
+  const ayurvedicTest = findTest("AY", "Prakriti") || findTestAny("Prakriti");
+  if (ayurvedicTest) result.ayurvedicTest = { result: ayurvedicTest.value || "" };
+  
+  // Ear Examination (EE) - Audiometry
+  const earCategory = testCategories.find(c => c.test_category_code === "EE");
+  if (earCategory && earCategory.data) {
+    const leftEarGraphTest = earCategory.data.find(t => t.name.toLowerCase().includes("left") && t.media);
+    const rightEarGraphTest = earCategory.data.find(t => t.name.toLowerCase().includes("right") && t.media);
+    
+    if (leftEarGraphTest || rightEarGraphTest) {
+      result.audiometry = {
+        leftEarGraph: leftEarGraphTest?.media?.link || "",
+        rightEarGraph: rightEarGraphTest?.media?.link || "",
+      };
+    }
+  }
+  
+  // Tuberculosis test
+  const tbTest = findTestAny("Tuberculosis") || findTestAny("TB");
+  if (tbTest) result.tuberculosisTest = { value: tbTest.result || "", recommendation: "" };
+  
+  // Lipid Profile / Cholesterol tests
+  const totalCholTest = findTestAny("Total Cholesterol");
+  if (totalCholTest) result.totalCholesterol = { value: `${totalCholTest.value} ${totalCholTest.unit || ""}`.trim(), status: totalCholTest.result || "" };
+  
+  const triglyceridesTest = findTestAny("Triglycerides");
+  if (triglyceridesTest) result.triglycerides = { value: `${triglyceridesTest.value} ${triglyceridesTest.unit || ""}`.trim(), status: triglyceridesTest.result || "" };
+  
+  const hdlTest = findTestAny("HDL") || findTestAny("HDL Cholesterol");
+  if (hdlTest) result.hdlCholesterol = { value: `${hdlTest.value} ${hdlTest.unit || ""}`.trim(), status: hdlTest.result || "" };
+  
+  const ldlTest = findTestAny("LDL") || findTestAny("LDL Cholesterol");
+  if (ldlTest) result.ldlCholesterol = { value: `${ldlTest.value} ${ldlTest.unit || ""}`.trim(), status: ldlTest.result || "" };
+  
+  return result;
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -7680,8 +7889,23 @@ app.get("/health", (req, res) => {
 app.post("/api/generate-pdf", async (req, res) => {
   try {
     // Extract health report data from request body
-    // If no data provided, will use default sample data
-    const healthData = req.body;
+    const requestBody = req.body;
+    
+    // Detect payload format and transform if needed
+    let healthData;
+    if (Array.isArray(requestBody.testCategories)) {
+      // New format: { testCategories: [...], patientInfo: {...} }
+      console.log("Detected new array-based payload format, transforming...");
+      healthData = transformPayload(requestBody.testCategories, requestBody.patientInfo || {});
+    } else if (Array.isArray(requestBody)) {
+      // New format: Array directly at root level
+      console.log("Detected array payload at root level, transforming...");
+      healthData = transformPayload(requestBody, {});
+    } else {
+      // Old format: flat object
+      console.log("Using legacy flat object payload format");
+      healthData = requestBody;
+    }
     
     // Extract optional PDF URLs to concatenate (as separate keys)
     const ecgPdfUrl = healthData.ecgPdfUrl || null;
