@@ -5,12 +5,18 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const { PDFDocument } = require("pdf-lib");
-
-// Helper function to get image path from assets folder (returns null if not found)
-function getImagePath(imageName) {
-  const imagePath = path.join(__dirname, "assets", imageName);
-  return fs.existsSync(imagePath) ? imagePath : null;
-}
+const {
+  getImagePath,
+  noLineLayout,
+  createThreeZoneBar,
+  createTwoZoneBar,
+  createFourZoneBar,
+  createHealthCard,
+  createSimpleCard,
+  createLipidCard,
+  createBodyIndicator,
+  fillColors,
+} = require("./pdfHelpers");
 
 /**
  * Fetches a PDF from a URL and returns it as a buffer
@@ -1436,6351 +1442,851 @@ function createPdfDocDefinition(data) {
 
       // ============ PAGE 2: TEST RESULTS ============
 
-      // Oxygen Saturation Section - Only render if value exists
-      ...(oxygenSaturation.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Green header row
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("o2.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Oxygen saturation",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: oxygenSaturation.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: oxygenSaturation.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        oxygenSaturation.status === "Normal"
-                          ? "#C8E6C9"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: oxygenSaturationDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar
-                        (() => {
-                          const oxygenValue =
-                            parseFloat(oxygenSaturation.value) || 94;
-                          const barWidth = 520;
-                          const lowBarWidth = barWidth * 0.5;
-                          const normalThreshold = 95;
-                          const minRange = 85;
-                          const maxRange = 100;
+      // Oxygen Saturation
+      ...createHealthCard({
+        icon: "o2.png",
+        label: "Oxygen saturation",
+        dataObj: oxygenSaturation,
+        description: oxygenSaturationDescription,
+        fillColorFn: fillColors.normalOrRed,
+        statusBarFn: () => createTwoZoneBar({
+          value: oxygenSaturation.value, defaultValue: 94, threshold: 95,
+          minRange: 85, maxRange: 100,
+          zones: [
+            { label: "Low", color: "#EF5350", labelMargin: [90, 6, 0, 0] },
+            { label: "Normal", color: "#4CAF50", labelMargin: [0, 6, 90, 0] },
+          ],
+        }),
+      }),
 
-                          let pointerPosition;
-                          if (oxygenValue < normalThreshold) {
-                            pointerPosition =
-                              ((oxygenValue - minRange) /
-                                (normalThreshold - minRange)) *
-                              lowBarWidth;
-                          } else {
-                            pointerPosition =
-                              lowBarWidth +
-                              ((oxygenValue - normalThreshold) /
-                                (maxRange - normalThreshold + 1)) *
-                                (barWidth - lowBarWidth);
-                          }
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
+      // Body Fat
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Body Fat",
+        dataObj: bodyFat,
+        description: bodyFatDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: bodyFat.value, defaultValue: 25,
+          lowThreshold: 21, highThreshold: 30, maxRange: 50,
+        }),
+      }),
 
-                          return {
-                            stack: [
-                              // Value above pointer
-                              {
-                                columns: [
-                                  {
-                                    text: String(normalThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar
-                              {
-                                canvas: [
-                                  // Red (Low) section
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Green (Normal) section
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: barWidth - lowBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "50%",
-                                    margin: [90, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    alignment: "right",
-                                    width: "50%",
-                                    margin: [0, 6, 90, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // Body Fat Section - Only render if value exists
-      ...(bodyFat.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Body fat",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: bodyFat.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: bodyFat.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        bodyFat.status === "Normal"
-                          ? "#C8E6C9"
-                          : bodyFat.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: bodyFatDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(bodyFat.value) || 25;
-                          const barWidth = 520;
+      // Subcutaneous Fat
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Subcutaneous fat",
+        dataObj: subcutaneousFat,
+        description: subcutaneousFatDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: subcutaneousFat.value, defaultValue: 15,
+          lowThreshold: 10, highThreshold: 20, maxRange: 40,
+        }),
+      }),
 
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 21;
-                          const highThreshold = 30;
-                          const maxRange = 50; // Max display range for pointer calculation
+      // Visceral Fat
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Visceral fat",
+        dataObj: visceralFat,
+        description: visceralFatDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: visceralFat.value, defaultValue: 8,
+          lowThreshold: 1, highThreshold: 12, maxRange: 30,
+        }),
+      }),
 
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // Subcutaneous fat
-      ...(subcutaneousFat.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Subcutaneous fat",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: subcutaneousFat.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: subcutaneousFat.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        subcutaneousFat.status === "Normal"
-                          ? "#C8E6C9"
-                          : subcutaneousFat.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: subcutaneousFatDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue =
-                            parseFloat(subcutaneousFat.value) || 25;
-                          const barWidth = 520;
-
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 18.5;
-                          const highThreshold = 26.7;
-                          const maxRange = 60; // Max display range for pointer calculation
-
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // Visceral fat
-      ...(visceralFat.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Visceral fat",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: visceralFat.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: visceralFat.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        visceralFat.status === "Normal"
-                          ? "#C8E6C9"
-                          : visceralFat.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: visceralFatDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(visceralFat.value) || 25;
-                          const barWidth = 520;
-
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 9;
-                          const highThreshold = 14;
-                          const maxRange = 30; // Max display range for pointer calculation
-
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
       // Body Water
-      ...(bodyWater.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Body water",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: bodyWater.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: bodyWater.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        bodyWater.status === "Normal"
-                          ? "#C8E6C9"
-                          : bodyWater.status === "Low"
-                          ? "#E3F2FD"
-                          : "#09922e",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: bodyWaterDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(bodyWater.value) || 25;
-                          const barWidth = 520;
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Body Water",
+        dataObj: bodyWater,
+        description: bodyWaterDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: bodyWater.value, defaultValue: 55,
+          lowThreshold: 50, highThreshold: 65, maxRange: 80,
+          zones: [
+            { label: "Low", color: "#2196F3" },
+            { label: "Normal", color: "#4CAF50" },
+            { label: "High", color: "#1B5E20" },
+          ],
+        }),
+      }),
 
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 45;
-                          const highThreshold = 60;
-                          const maxRange = 80; // Max display range for pointer calculation
-
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#09922e",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Adequate",
-                                    fontSize: 10,
-                                    color: "#09922e",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
       // Skeletal Muscle
-      ...(skeletalMuscle.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Skeletal muscle",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: skeletalMuscle.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: skeletalMuscle.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        skeletalMuscle.status === "Normal"
-                          ? "#C8E6C9"
-                          : skeletalMuscle.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: skeletalMuscleDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue =
-                            parseFloat(skeletalMuscle.value) || 25;
-                          const barWidth = 520;
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Skeletal Muscle",
+        dataObj: skeletalMuscle,
+        description: skeletalMuscleDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: skeletalMuscle.value, defaultValue: 30,
+          lowThreshold: 25, highThreshold: 35, maxRange: 50,
+          zones: [
+            { label: "Low", color: "#2196F3" },
+            { label: "Normal", color: "#4CAF50" },
+            { label: "High", color: "#1B5E20" },
+          ],
+        }),
+      }),
 
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 40;
-                          const highThreshold = 50;
-                          const maxRange = 70; // Max display range for pointer calculation
-
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
       // Muscle Mass
-      ...(muscleMass.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Muscle Mass",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: muscleMass.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: muscleMass.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        muscleMass.status === "Normal"
-                          ? "#C8E6C9"
-                          : muscleMass.status === "Low"
-                          ? "#E3F2FD"
-                          : "#09922e",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: muscleMassDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(muscleMass.value);
-                          const barWidth = 520;
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Muscle Mass",
+        dataObj: muscleMass,
+        description: muscleMassDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: muscleMass.value, defaultValue: 30,
+          lowThreshold: 25, highThreshold: 35, maxRange: 50,
+          zones: [
+            { label: "Low", color: "#2196F3" },
+            { label: "Normal", color: "#4CAF50" },
+            { label: "High", color: "#1B5E20" },
+          ],
+        }),
+      }),
 
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 32.9;
-                          const highThreshold = 37.5;
-                          const maxRange = 120; // Max display range for pointer calculation
+      // Bone Mass
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Bone Mass",
+        dataObj: boneMass,
+        description: boneMassDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: boneMass.value, defaultValue: 3,
+          lowThreshold: 2, highThreshold: 4, maxRange: 6,
+          zones: [
+            { label: "Low", color: "#2196F3" },
+            { label: "Normal", color: "#4CAF50" },
+            { label: "High", color: "#1B5E20" },
+          ],
+        }),
+      }),
 
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
+      // Protein
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Protein",
+        dataObj: protein,
+        description: proteinDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: protein.value, defaultValue: 7,
+          lowThreshold: 6.4, highThreshold: 8.3, maxRange: 12,
+          zones: [
+            { label: "Low", color: "#2196F3" },
+            { label: "Normal", color: "#4CAF50" },
+            { label: "High", color: "#1B5E20" },
+          ],
+        }),
+      }),
 
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
+      // BMR
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Basal Metabolic rate (BMR)",
+        dataObj: bmr,
+        description: bmrDescription,
+        fillColorFn: fillColors.normalOrRed,
+        statusBarFn: () => createTwoZoneBar({
+          value: bmr.value, defaultValue: 1400, threshold: 1200,
+          minRange: 800, maxRange: 2500,
+          zones: [
+            { label: "Low", color: "#EF5350", labelMargin: [90, 6, 0, 0] },
+            { label: "Normal", color: "#4CAF50", labelMargin: [0, 6, 90, 0] },
+          ],
+        }),
+      }),
 
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
+      // Metabolic Age
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Metabolic Age",
+        dataObj: metabolicAge,
+        description: metabolicAgeDescription,
+        fillColorFn: fillColors.normalOrRed,
+        statusBarFn: () => createTwoZoneBar({
+          value: metabolicAge.value, defaultValue: 25, threshold: parseFloat(age) || 30,
+          minRange: 15, maxRange: 80,
+          zones: [
+            { label: "Normal", color: "#4CAF50", labelMargin: [90, 6, 0, 0] },
+            { label: "Not upto normal", color: "#EF5350", labelMargin: [0, 6, 90, 0] },
+          ],
+        }),
+      }),
 
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#09922e",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Adequate",
-                                    fontSize: 10,
-                                    color: "#09922e",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // Bone Mass (Blue to Green to Red)
-      ...(boneMass.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Bone mass",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: boneMass.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: boneMass.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        boneMass.status === "Normal"
-                          ? "#C8E6C9"
-                          : boneMass.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: boneMassDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(boneMass.value) || 25;
-                          const barWidth = 520;
+      // Body Temperature
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Body temperature",
+        dataObj: bodyTemperature,
+        description: bodyTemperatureDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: bodyTemperature.value, defaultValue: 25,
+          lowThreshold: 35.5, highThreshold: 37.2, maxRange: 42,
+        }),
+      }),
 
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 2.3;
-                          const highThreshold = 2.7;
-                          const maxRange = 5; // Max display range for pointer calculation
+      // BP Systolic
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Blood pressure (Systolic)",
+        dataObj: bpSystolic,
+        description: bpSystolicDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: bpSystolic.value, defaultValue: 120,
+          lowThreshold: 90, highThreshold: 139, maxRange: 200,
+        }),
+      }),
 
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
+      // BP Diastolic
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Blood pressure (Diastolic)",
+        dataObj: bpDiastolic,
+        description: bpDiastolicDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: bpDiastolic.value, defaultValue: 25,
+          lowThreshold: 60, highThreshold: 89, maxRange: 200,
+        }),
+      }),
 
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
+      // Pulse
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Pulse",
+        dataObj: pulse,
+        description: pulseDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: pulse.value, defaultValue: 72,
+          lowThreshold: 60, highThreshold: 100, maxRange: 200,
+        }),
+      }),
 
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
+      // Hemoglobin
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Hemoglobin",
+        dataObj: hemoglobin,
+        description: hemoglobinDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: hemoglobin.value, defaultValue: 14,
+          lowThreshold: 11, highThreshold: 16, maxRange: 20,
+        }),
+      }),
 
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // Protein (Blue to Green to Dark Green)
-      ...(protein.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Protein",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: protein.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: protein.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        protein.status === "Normal"
-                          ? "#C8E6C9"
-                          : protein.status === "Low"
-                          ? "#E3F2FD"
-                          : "#09922e",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: proteinDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(protein.value);
-                          const barWidth = 520;
+      // Glucose (4-zone)
+      ...createHealthCard({
+        icon: "glucose.png",
+        label: "Blood sugar (Post Prandial)",
+        dataObj: glucose,
+        description: glucoseDescription,
+        fillColorFn: (status) =>
+          status === "Normal" ? "#C8E6C9"
+          : status === "Pre-Diabetic" ? "#FFF9C4"
+          : "#FFCDD2",
+        statusBarFn: () => createFourZoneBar({
+          value: glucose.value, defaultValue: 100,
+          thresholds: [80, 140, 200], maxRange: 400,
+          zones: [
+            { label: "Low", color: "#2196F3" },
+            { label: "Normal", color: "#4CAF50" },
+            { label: "Pre-Diabetic", color: "#FFC107" },
+            { label: "Diabetic", color: "#EF5350" },
+          ],
+        }),
+      }),
 
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 16;
-                          const highThreshold = 18;
-                          const maxRange = 30; // Max display range for pointer calculation
+      // Uric Acid
+      ...createHealthCard({
+        icon: "fat.png",
+        label: "Uric Acid",
+        dataObj: uricAcid,
+        description: uricAcidDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        statusBarFn: () => createThreeZoneBar({
+          value: uricAcid.value, defaultValue: 5,
+          lowThreshold: 2.4, highThreshold: 7, maxRange: 12,
+        }),
+      }),
 
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
+      // Left Eye
+      ...createSimpleCard({
+        icon: "eye.png",
+        label: "Left Eye",
+        dataObj: leftEye,
+        description: leftEyeDescription,
+        fillColorFn: fillColors.normalOrRedSimple,
+        margin: [25, 20, 25, 10],
+      }),
 
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
+      // Right Eye
+      ...createSimpleCard({
+        icon: "eye.png",
+        label: "Right Eye",
+        dataObj: rightEye,
+        description: rightEyeDescription,
+        fillColorFn: fillColors.normalOrRedSimple,
+        margin: [25, 10, 25, 20],
+      }),
 
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#09922e",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Adequate",
-                                    fontSize: 10,
-                                    color: "#09922e",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // BMR (Red to Green)
-      ...(bmr.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Green header row
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("o2.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "BMR",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: bmr.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: bmr.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        bmr.status === "Normal" ? "#C8E6C9" : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: bmrDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar
-                        (() => {
-                          const bmrValue = parseFloat(bmr.value);
-                          const barWidth = 520;
-                          const lowBarWidth = barWidth * 0.5;
-                          const normalThreshold = 1615;
-                          const minRange = 800;
-                          const maxRange = 4000;
-
-                          let pointerPosition;
-                          if (bmrValue < normalThreshold) {
-                            pointerPosition =
-                              ((bmrValue - minRange) /
-                                (normalThreshold - minRange)) *
-                              lowBarWidth;
-                          } else {
-                            pointerPosition =
-                              lowBarWidth +
-                              ((bmrValue - normalThreshold) /
-                                (maxRange - normalThreshold + 1)) *
-                                (barWidth - lowBarWidth);
-                          }
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  {
-                                    text: String(normalThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar
-                              {
-                                canvas: [
-                                  // Red (Low) section
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Green (Normal) section
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: barWidth - lowBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Not Upto Standard",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "50%",
-                                    margin: [90, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Standard",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    alignment: "right",
-                                    width: "50%",
-                                    margin: [0, 6, 90, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // Metabolic Age (Green to Red)
-      ...(metabolicAge.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Green header row
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("o2.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Metabolic Age",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: metabolicAge.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: metabolicAge.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        metabolicAge.status === "Normal"
-                          ? "#C8E6C9"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: metabolicAgeDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar
-                        (() => {
-                          const metabolicAgeValue = parseFloat(
-                            metabolicAge.value
-                          );
-                          const barWidth = 520;
-                          const lowBarWidth = barWidth * 0.5;
-                          const normalThreshold = 27;
-                          const minRange = 15;
-                          const maxRange = 90;
-
-                          let pointerPosition;
-                          if (metabolicAgeValue < normalThreshold) {
-                            pointerPosition =
-                              ((metabolicAgeValue - minRange) /
-                                (normalThreshold - minRange)) *
-                              lowBarWidth;
-                          } else {
-                            pointerPosition =
-                              lowBarWidth +
-                              ((metabolicAgeValue - normalThreshold) /
-                                (maxRange - normalThreshold + 1)) *
-                                (barWidth - lowBarWidth);
-                          }
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  {
-                                    text: String(normalThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar
-                              {
-                                canvas: [
-                                  // Red (Low) section
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Green (Normal) section
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: barWidth - lowBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: "50%",
-                                    margin: [90, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Not upto normal",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    alignment: "right",
-                                    width: "50%",
-                                    margin: [0, 6, 90, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // Body temperature (Blue to Green to Red)
-      ...(bodyTemperature.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Body temperature",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: bodyTemperature.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: bodyTemperature.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        bodyTemperature.status === "Normal"
-                          ? "#C8E6C9"
-                          : bodyTemperature.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: bodyTemperatureDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue =
-                            parseFloat(bodyTemperature.value) || 25;
-                          const barWidth = 520;
-
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 35.5;
-                          const highThreshold = 37.2;
-                          const maxRange = 42; // Max display range for pointer calculation
-
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // BP systolic (Blue to Green to Red)
-      ...(bpSystolic.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Blood pressure (Systolic)",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: bpSystolic.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: bpSystolic.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        bpSystolic.status === "Normal"
-                          ? "#C8E6C9"
-                          : bpSystolic.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: bpSystolicDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(bpSystolic.value) || 25;
-                          const barWidth = 520;
-
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 90;
-                          const highThreshold = 139;
-                          const maxRange = 200; // Max display range for pointer calculation
-
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // BP Diastolic (Blue to Green to Red)
-      ...(bpDiastolic.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Blood pressure (Diastolic)",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: bpDiastolic.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: bpDiastolic.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        bpDiastolic.status === "Normal"
-                          ? "#C8E6C9"
-                          : bpDiastolic.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: bpDiastolicDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(bpDiastolic.value) || 25;
-                          const barWidth = 520;
-
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 60;
-                          const highThreshold = 89;
-                          const maxRange = 200; // Max display range for pointer calculation
-
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      //Pulse (Blue to Green to Red)
-      ...(pulse.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Pulse",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: pulse.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: pulse.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        pulse.status === "Normal"
-                          ? "#C8E6C9"
-                          : pulse.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: pulseDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(pulse.value);
-                          const barWidth = 520;
-
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 60;
-                          const highThreshold = 100;
-                          const maxRange = 200; // Max display range for pointer calculation
-
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      //Hemoglobin (Blue to Green to Red)
-      ...(hemoglobin.value
-        ? [
-            // Full card using table for background
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("fat.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Hemoglobin",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: hemoglobin.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: hemoglobin.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        hemoglobin.status === "Normal"
-                          ? "#C8E6C9"
-                          : hemoglobin.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row (light background)
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: hemoglobinDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with three zones: Low (blue), Normal (green), High (red)
-                        (() => {
-                          const fatValue = parseFloat(hemoglobin.value);
-                          const barWidth = 520;
-
-                          // Thresholds: Low = 0-21%, Normal = 21-30%, High = 30%+
-                          const lowThreshold = 11;
-                          const highThreshold = 16;
-                          const maxRange = 20; // Max display range for pointer calculation
-
-                          // Equal width for all three sections
-                          const sectionWidth = barWidth / 3;
-                          const lowBarWidth = sectionWidth;
-                          const normalBarWidth = sectionWidth;
-                          const highBarWidth = sectionWidth;
-
-                          // Calculate pointer position based on actual value and thresholds
-                          let pointerPosition;
-                          if (fatValue <= lowThreshold) {
-                            // In Low zone (0-21%)
-                            pointerPosition =
-                              (fatValue / lowThreshold) * sectionWidth;
-                          } else if (fatValue <= highThreshold) {
-                            // In Normal zone (21-30%)
-                            pointerPosition =
-                              sectionWidth +
-                              ((fatValue - lowThreshold) /
-                                (highThreshold - lowThreshold)) *
-                                sectionWidth;
-                          } else {
-                            // In High zone (30%+)
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(fatValue, maxRange) - highThreshold) /
-                                highRangeMax) *
-                                sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(
-                            12,
-                            Math.min(barWidth - 12, pointerPosition)
-                          );
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: lowBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: normalBarWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with three sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-21%
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: lowBarWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 21-30%
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth,
-                                    y: 0,
-                                    w: normalBarWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Red (High) section - 30%+
-                                  {
-                                    type: "rect",
-                                    x: lowBarWidth + normalBarWidth,
-                                    y: 0,
-                                    w: highBarWidth,
-                                    h: 14,
-                                    color: "#EF5350",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 10,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: lowBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 10,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: normalBarWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "High",
-                                    fontSize: 10,
-                                    color: "#EF5350",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // Glucose Section - 4 zones: Low (Blue), Normal (Green), Pre-Diabetic (Yellow), Diabetic (Red)
-      ...(glucose.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("glucose.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Glucose",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                        },
-                        // Value
-                        {
-                          text: glucose.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [-50, 6, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: glucose.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 6, 0, 0],
-                        },
-                      ],
-                      fillColor:
-                        glucose.status === "Normal"
-                          ? "#C8E6C9"
-                          : glucose.status === "Low"
-                          ? "#E3F2FD"
-                          : glucose.status === "Pre-Diabetic"
-                          ? "#FFF9C4"
-                          : "#FFEBEE",
-                      margin: [10, 10, 10, 10],
-                    },
-                  ],
-                  // Description and status bar row
-                  [
-                    {
-                      stack: [
-                        // Description text
-                        {
-                          text: glucoseDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [0, 10, 0, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [0, 0, 0, 15],
-                        },
-                        // Status bar with 4 zones
-                        (() => {
-                          const glucoseValue = parseFloat(glucose.value) || 100;
-                          const barWidth = 520;
-
-                          // Thresholds: Low = 0-60, Normal = 60-140, Pre-Diabetic = 140-199, Diabetic = 199+
-                          const lowThreshold = 60;
-                          const normalThreshold = 140;
-                          const preDiabeticThreshold = 199;
-                          const maxRange = 300; // Max display range
-
-                          // Equal width for all 4 sections
-                          const sectionWidth = barWidth / 4;
-
-                          // Calculate pointer position based on value
-                          let pointerPosition;
-                          if (glucoseValue <= lowThreshold) {
-                            // Low zone (0-60)
-                            pointerPosition = (glucoseValue / lowThreshold) * sectionWidth;
-                          } else if (glucoseValue <= normalThreshold) {
-                            // Normal zone (60-140)
-                            pointerPosition =
-                              sectionWidth +
-                              ((glucoseValue - lowThreshold) / (normalThreshold - lowThreshold)) * sectionWidth;
-                          } else if (glucoseValue <= preDiabeticThreshold) {
-                            // Pre-Diabetic zone (140-199)
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((glucoseValue - normalThreshold) / (preDiabeticThreshold - normalThreshold)) * sectionWidth;
-                          } else {
-                            // Diabetic zone (199+)
-                            const diabeticRangeMax = maxRange - preDiabeticThreshold;
-                            pointerPosition =
-                              sectionWidth * 3 +
-                              ((Math.min(glucoseValue, maxRange) - preDiabeticThreshold) / diabeticRangeMax) * sectionWidth;
-                          }
-
-                          // Clamp pointer position
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
-
-                          return {
-                            stack: [
-                              // Threshold markers
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: sectionWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(normalThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: sectionWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(preDiabeticThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: sectionWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: "",
-                                    width: "*",
-                                  },
-                                ],
-                              },
-                              // Scale bar with 4 sections
-                              {
-                                canvas: [
-                                  // Blue (Low) section - 0-60
-                                  {
-                                    type: "rect",
-                                    x: 0,
-                                    y: 0,
-                                    w: sectionWidth,
-                                    h: 14,
-                                    color: "#2196F3",
-                                  },
-                                  // Green (Normal) section - 60-140
-                                  {
-                                    type: "rect",
-                                    x: sectionWidth,
-                                    y: 0,
-                                    w: sectionWidth,
-                                    h: 14,
-                                    color: "#4CAF50",
-                                  },
-                                  // Yellow (Pre-Diabetic) section - 140-199
-                                  {
-                                    type: "rect",
-                                    x: sectionWidth * 2,
-                                    y: 0,
-                                    w: sectionWidth,
-                                    h: 14,
-                                    color: "#FFC107",
-                                  },
-                                  // Red (Diabetic) section - 199+
-                                  {
-                                    type: "rect",
-                                    x: sectionWidth * 3,
-                                    y: 0,
-                                    w: sectionWidth,
-                                    h: 14,
-                                    color: "#C62828",
-                                  },
-                                  // Pointer circle
-                                  {
-                                    type: "ellipse",
-                                    x: pointerPosition,
-                                    y: 7,
-                                    r1: 10,
-                                    r2: 10,
-                                    lineColor: "#424242",
-                                    lineWidth: 2,
-                                    color: "white",
-                                  },
-                                ],
-                              },
-                              // Labels
-                              {
-                                columns: [
-                                  {
-                                    text: "Low",
-                                    fontSize: 9,
-                                    color: "#2196F3",
-                                    italics: true,
-                                    width: sectionWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Normal",
-                                    fontSize: 9,
-                                    color: "#4CAF50",
-                                    italics: true,
-                                    width: sectionWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Pre-Diabetic",
-                                    fontSize: 9,
-                                    color: "#FFC107",
-                                    italics: true,
-                                    width: sectionWidth,
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                  {
-                                    text: "Diabetic",
-                                    fontSize: 9,
-                                    color: "#C62828",
-                                    italics: true,
-                                    width: "*",
-                                    alignment: "center",
-                                    margin: [0, 6, 0, 0],
-                                  },
-                                ],
-                              },
-                            ],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                      margin: [10, 5, 10, 15],
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 20],
-            },
-          ]
-        : []),
-      // Left Eye Section
-      ...(leftEye.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Green left accent border
-                        // {
-                        //   canvas: [
-                        //     {
-                        //       type: "rect",
-                        //       x: 0,
-                        //       y: 0,
-                        //       w: 4,
-                        //       h: 48,
-                        //       color: "#4CAF50",
-                        //     },
-                        //   ],
-                        //   width: 4,
-                        // },
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("eye.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Left Eye",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "40%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        // Value
-                        {
-                          text: leftEye.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: leftEye.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        leftEye.status === "Normal" ? "#C8E6C9" : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  // Description row
-                  [
-                    {
-                      stack: [
-                        {
-                          text: leftEyeDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 20, 25, 10],
-            },
-          ]
-        : []),
-      // Right Eye Section
-      ...(rightEye.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Green left accent border
-                        // {
-                        //   canvas: [
-                        //     {
-                        //       type: "rect",
-                        //       x: 0,
-                        //       y: 0,
-                        //       w: 4,
-                        //       h: 48,
-                        //       color: "#4CAF50",
-                        //     },
-                        //   ],
-                        //   width: 4,
-                        // },
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("eye.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Right Eye",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "40%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        // Value
-                        {
-                          text: rightEye.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: rightEye.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        rightEye.status === "Normal" ? "#C8E6C9" : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  // Description row
-                  [
-                    {
-                      stack: [
-                        {
-                          text: rightEyeDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 10, 25, 20],
-            },
-          ]
-        : []),
       // Lipid and HbA1c Test Title
       ...((totalCholesterol.value || triglycerides.value || hdlCholesterol.value || nonHdlCholesterol.value || ldlCholesterol.value || cholesterolRatio.value || hba1c.value)
-        ? [
-            {
-              text: "Lipid and HbA1c Test",
-              fontSize: 14,
-              bold: true,
-              color: "#3C678C",
-              alignment: "center",
-              margin: [25, 20, 25, 15],
-            },
-          ]
+        ? [{ text: "Lipid and HbA1c Test", fontSize: 14, bold: true, color: "#3C678C", alignment: "center", margin: [25, 20, 25, 15] }]
         : []),
-      // Total Cholesterol Section - 3 zones: Desirable (Green), Borderline High (Yellow), High (Red)
-      ...(totalCholesterol.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Yellow left accent border
-                        // {
-                        //   canvas: [
-                        //     {
-                        //       type: "rect",
-                        //       x: 0,
-                        //       y: 0,
-                        //       w: 4,
-                        //       h: 48,
-                        //       color: "#FFC107",
-                        //     },
-                        //   ],
-                        //   width: 4,
-                        // },
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("cholesterol.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Total Cholesterol",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "40%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        // Value
-                        {
-                          text: totalCholesterol.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: totalCholesterol.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        totalCholesterol.status === "Desirable"
-                          ? "#C8E6C9"
-                          : totalCholesterol.status === "Borderline High"
-                          ? "#FFC107"
-                          : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  // Description and status bar row
-                  [
-                    {
-                      stack: [
-                        {
-                          text: totalCholesterolDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        // Status bar with 3 zones
-                        (() => {
-                          const cholesterolValue = parseFloat(totalCholesterol.value) || 200;
-                          const barWidth = 520;
 
-                          // Thresholds: Desirable = 0-200, Borderline High = 200-239, High = 239+
-                          const desirableThreshold = 200;
-                          const highThreshold = 239;
-                          const maxRange = 300;
+      // Total Cholesterol
+      ...createLipidCard({
+        icon: "cholesterol.png",
+        label: "Total Cholesterol",
+        dataObj: totalCholesterol,
+        description: totalCholesterolDescription,
+        fillColorFn: (status) =>
+          status === "Desirable" ? "#C8E6C9"
+          : status === "Borderline High" ? "#FFC107"
+          : "#FFCDD2",
+        statusBarFn: () => {
+          const bar = createThreeZoneBar({
+            value: totalCholesterol.value, defaultValue: 200,
+            lowThreshold: 200, highThreshold: 239, maxRange: 300,
+            zones: [
+              { label: "Desirable", color: "#4CAF50" },
+              { label: "Borderline High", color: "#FFC107" },
+              { label: "High", color: "#EF5350" },
+            ],
+            labelFontSize: 9,
+          });
+          bar.margin = [10, 0, 10, 15];
+          return bar;
+        },
+      }),
 
-                          const sectionWidth = barWidth / 3;
+      // Triglycerides
+      ...createLipidCard({
+        icon: "cholesterol.png",
+        label: "Triglycerides",
+        dataObj: triglycerides,
+        description: triglyceridesDescription,
+        fillColorFn: (status) =>
+          status === "Desirable" ? "#C8E6C9"
+          : status === "Border Line" ? "#FFC107"
+          : "#FFCDD2",
+        statusBarFn: () => {
+          const bar = createThreeZoneBar({
+            value: triglycerides.value, defaultValue: 100,
+            lowThreshold: 150, highThreshold: 199, maxRange: 300,
+            zones: [
+              { label: "Desirable", color: "#4CAF50" },
+              { label: "Border Line", color: "#FFC107" },
+              { label: "High", color: "#EF5350" },
+            ],
+            labelFontSize: 9,
+          });
+          bar.margin = [10, 0, 10, 15];
+          return bar;
+        },
+      }),
 
-                          let pointerPosition;
-                          if (cholesterolValue <= desirableThreshold) {
-                            pointerPosition = (cholesterolValue / desirableThreshold) * sectionWidth;
-                          } else if (cholesterolValue <= highThreshold) {
-                            pointerPosition =
-                              sectionWidth +
-                              ((cholesterolValue - desirableThreshold) / (highThreshold - desirableThreshold)) * sectionWidth;
-                          } else {
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(cholesterolValue, maxRange) - highThreshold) / highRangeMax) * sectionWidth;
-                          }
+      // HDL Cholesterol
+      ...createLipidCard({
+        icon: "cholesterol.png",
+        label: "High-density lipo-protein (HDL) cholesterol",
+        dataObj: hdlCholesterol,
+        description: hdlCholesterolDescription,
+        fillColorFn: (status) =>
+          status === "Desirable" ? "#09922e"
+          : status === "Normal" ? "#C8E6C9"
+          : "#E3F2FD",
+        margin: [25, 10, 25, 20],
+        labelFontSize: 10,
+        iconWidth: "50%",
+        valueWidth: "20%",
+        statusWidth: "25%",
+        statusBarFn: () => {
+          const bar = createThreeZoneBar({
+            value: hdlCholesterol.value, defaultValue: 50,
+            lowThreshold: 40, highThreshold: 60, maxRange: 100,
+            zones: [
+              { label: "Low", color: "#2196F3" },
+              { label: "Normal", color: "#4CAF50" },
+              { label: "Desirable", color: "#09922e" },
+            ],
+            labelFontSize: 9,
+          });
+          bar.margin = [10, 0, 10, 15];
+          return bar;
+        },
+      }),
 
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
+      // Non-HDL Cholesterol
+      ...createLipidCard({
+        icon: "cholesterol.png",
+        label: "Non-high-density lipo-protein (NON-HDL) cholesterol",
+        dataObj: nonHdlCholesterol,
+        description: nonHdlCholesterolDescription,
+        fillColorFn: (status) =>
+          (status === "Desirable" || status === "desirable") ? "#C8E6C9"
+          : status === "Border Line" ? "#FFC107"
+          : "#FFCDD2",
+        labelFontSize: 9,
+        iconWidth: "50%",
+        valueWidth: "20%",
+        statusWidth: "25%",
+        statusBarFn: () => {
+          const bar = createThreeZoneBar({
+            value: nonHdlCholesterol.value, defaultValue: 130,
+            lowThreshold: 159, highThreshold: 179, maxRange: 250,
+            zones: [
+              { label: "Desirable", color: "#4CAF50" },
+              { label: "Border Line", color: "#FFC107" },
+              { label: "High", color: "#EF5350" },
+            ],
+            labelFontSize: 9,
+          });
+          bar.margin = [10, 0, 10, 15];
+          return bar;
+        },
+      }),
 
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  {
-                                    text: String(desirableThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: sectionWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: sectionWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#FFC107" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#EF5350" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Desirable", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Borderline High", fontSize: 9, color: "#FFC107", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "High", fontSize: 9, color: "#EF5350", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 10, 25, 10],
-            },
-          ]
-        : []),
-      // Triglycerides Section - 3 zones: Desirable (Green), Border Line (Yellow), High (Red)
-      ...(triglycerides.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Yellow left accent border
-                        // {
-                        //   canvas: [
-                        //     {
-                        //       type: "rect",
-                        //       x: 0,
-                        //       y: 0,
-                        //       w: 4,
-                        //       h: 48,
-                        //       color: "#FFC107",
-                        //     },
-                        //   ],
-                        //   width: 4,
-                        // },
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("cholesterol.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Triglycerides",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "40%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        // Value
-                        {
-                          text: triglycerides.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: triglycerides.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "30%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        triglycerides.status === "Desirable"
-                          ? "#C8E6C9"
-                          : triglycerides.status === "Border Line"
-                          ? "#FFC107"
-                          : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  // Description and status bar row
-                  [
-                    {
-                      stack: [
-                        {
-                          text: triglyceridesDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        // Status bar with 3 zones
-                        (() => {
-                          const triglyceridesValue = parseFloat(triglycerides.value) || 100;
-                          const barWidth = 520;
+      // LDL Cholesterol (4-zone)
+      ...createLipidCard({
+        icon: "cholesterol.png",
+        label: "Low-density lipo-protein (LDL) cholesterol",
+        dataObj: ldlCholesterol,
+        description: ldlCholesterolDescription,
+        fillColorFn: (status) =>
+          status === "Optimal" ? "#C8E6C9"
+          : status === "Near Optimal" ? "#FFC107"
+          : status === "Slightly High" ? "#FFCC80"
+          : "#FFCDD2",
+        labelFontSize: 10,
+        iconWidth: "50%",
+        valueWidth: "20%",
+        statusWidth: "25%",
+        statusBarFn: () => {
+          const bar = createFourZoneBar({
+            value: ldlCholesterol.value, defaultValue: 100,
+            thresholds: [100, 129, 159], maxRange: 200,
+            zones: [
+              { label: "Optimal", color: "#4CAF50" },
+              { label: "Near Optimal", color: "#FFC107" },
+              { label: "Slightly High", color: "#FF9800" },
+              { label: "High", color: "#EF5350" },
+            ],
+          });
+          bar.margin = [10, 0, 10, 15];
+          return bar;
+        },
+      }),
 
-                          // Thresholds: Desirable = 0-150, Border Line = 150-199, High = 199+
-                          const desirableThreshold = 150;
-                          const highThreshold = 199;
-                          const maxRange = 300;
+      // Cholesterol Ratio
+      ...createLipidCard({
+        icon: "cholesterol.png",
+        label: "Total CHOL/HDL Cholesterol ratio",
+        dataObj: cholesterolRatio,
+        description: cholesterolRatioDescription,
+        fillColorFn: fillColors.lowNormalHigh,
+        iconWidth: "50%",
+        valueWidth: "20%",
+        statusWidth: "25%",
+        statusBarFn: () => {
+          const bar = createThreeZoneBar({
+            value: cholesterolRatio.value, defaultValue: 4,
+            lowThreshold: 3.5, highThreshold: 5, maxRange: 8,
+          });
+          bar.margin = [10, 0, 10, 15];
+          return bar;
+        },
+      }),
 
-                          const sectionWidth = barWidth / 3;
+      // HBA1C (4-zone)
+      ...createLipidCard({
+        icon: "cholesterol.png",
+        label: "HBA1C",
+        dataObj: hba1c,
+        description: hba1cDescription,
+        fillColorFn: (status) =>
+          status === "Normal" ? "#C8E6C9"
+          : status === "Pre-Diabetic" ? "#FFF9C4"
+          : "#FFCDD2",
+        statusBarFn: () => {
+          const bar = createFourZoneBar({
+            value: hba1c.value, defaultValue: 5.5,
+            thresholds: [4.0, 5.6, 6.4], maxRange: 14,
+            zones: [
+              { label: "Low", color: "#2196F3" },
+              { label: "Normal", color: "#4CAF50" },
+              { label: "Pre-Diabetic", color: "#FFC107" },
+              { label: "Diabetic", color: "#EF5350" },
+            ],
+          });
+          bar.margin = [10, 0, 10, 15];
+          return bar;
+        },
+      }),
 
-                          let pointerPosition;
-                          if (triglyceridesValue <= desirableThreshold) {
-                            pointerPosition = (triglyceridesValue / desirableThreshold) * sectionWidth;
-                          } else if (triglyceridesValue <= highThreshold) {
-                            pointerPosition =
-                              sectionWidth +
-                              ((triglyceridesValue - desirableThreshold) / (highThreshold - desirableThreshold)) * sectionWidth;
-                          } else {
-                            const highRangeMax = maxRange - highThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(triglyceridesValue, maxRange) - highThreshold) / highRangeMax) * sectionWidth;
-                          }
-
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  {
-                                    text: String(desirableThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: sectionWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(highThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: sectionWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#FFC107" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#EF5350" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Desirable", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Border Line", fontSize: 9, color: "#FFC107", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "High", fontSize: 9, color: "#EF5350", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 10, 25, 10],
-            },
-          ]
-        : []),
-      // HDL Cholesterol Section - 3 zones: Low (Blue), Normal (Green), Desirable (Dark Green)
-      ...(hdlCholesterol.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  // Header row with dynamic color based on status
-                  [
-                    {
-                      columns: [
-                        // Yellow left accent border
-                        // {
-                        //   canvas: [
-                        //     {
-                        //       type: "rect",
-                        //       x: 0,
-                        //       y: 0,
-                        //       w: 4,
-                        //       h: 48,
-                        //       color: "#FFC107",
-                        //     },
-                        //   ],
-                        //   width: 4,
-                        // },
-                        // Icon and label
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("cholesterol.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "High-density lipo-protein (HDL) cholesterol",
-                              fontSize: 10,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "50%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        // Value
-                        {
-                          text: hdlCholesterol.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "20%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        // Status
-                        {
-                          text: hdlCholesterol.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "25%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        hdlCholesterol.status === "Desirable"
-                          ? "#09922e"
-                          : hdlCholesterol.status === "Normal"
-                          ? "#C8E6C9"
-                          : "#E3F2FD",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  // Description and status bar row
-                  [
-                    {
-                      stack: [
-                        {
-                          text: hdlCholesterolDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        // Status bar with 3 zones
-                        (() => {
-                          const hdlValue = parseFloat(hdlCholesterol.value) || 50;
-                          const barWidth = 520;
-
-                          // Thresholds: Low = 0-40, Normal = 40-60, Desirable = 60+
-                          const lowThreshold = 40;
-                          const normalThreshold = 60;
-                          const maxRange = 100;
-
-                          const sectionWidth = barWidth / 3;
-
-                          let pointerPosition;
-                          if (hdlValue <= lowThreshold) {
-                            pointerPosition = (hdlValue / lowThreshold) * sectionWidth;
-                          } else if (hdlValue <= normalThreshold) {
-                            pointerPosition =
-                              sectionWidth +
-                              ((hdlValue - lowThreshold) / (normalThreshold - lowThreshold)) * sectionWidth;
-                          } else {
-                            const desirableRangeMax = maxRange - normalThreshold;
-                            pointerPosition =
-                              sectionWidth * 2 +
-                              ((Math.min(hdlValue, maxRange) - normalThreshold) / desirableRangeMax) * sectionWidth;
-                          }
-
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  {
-                                    text: String(lowThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: sectionWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  {
-                                    text: String(normalThreshold),
-                                    fontSize: 9,
-                                    color: "#666",
-                                    width: sectionWidth,
-                                    alignment: "right",
-                                    margin: [0, 0, -5, 4],
-                                  },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#2196F3" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#09922e" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Low", fontSize: 9, color: "#2196F3", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Normal", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Desirable", fontSize: 9, color: "#09922e", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: {
-                hLineWidth: () => 0,
-                vLineWidth: () => 0,
-                paddingLeft: () => 0,
-                paddingRight: () => 0,
-                paddingTop: () => 0,
-                paddingBottom: () => 0,
-              },
-              margin: [25, 10, 25, 20],
-            },
-          ]
-        : []),
-      // Non-HDL Cholesterol Section - 3 zones: Desirable (Green), Border Line (Yellow), High (Red)
-      ...(nonHdlCholesterol.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("cholesterol.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Non-high-density lipo-protein (NON-HDL) cholesterol",
-                              fontSize: 9,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "50%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        {
-                          text: nonHdlCholesterol.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "20%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        {
-                          text: nonHdlCholesterol.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "25%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        nonHdlCholesterol.status === "Desirable" || nonHdlCholesterol.status === "desirable"
-                          ? "#C8E6C9"
-                          : nonHdlCholesterol.status === "Border Line"
-                          ? "#FFC107"
-                          : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  [
-                    {
-                      stack: [
-                        {
-                          text: nonHdlCholesterolDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        (() => {
-                          const value = parseFloat(nonHdlCholesterol.value) || 130;
-                          const barWidth = 520;
-                          const desirableThreshold = 159;
-                          const highThreshold = 179;
-                          const maxRange = 250;
-                          const sectionWidth = barWidth / 3;
-
-                          let pointerPosition;
-                          if (value <= desirableThreshold) {
-                            pointerPosition = (value / desirableThreshold) * sectionWidth;
-                          } else if (value <= highThreshold) {
-                            pointerPosition = sectionWidth + ((value - desirableThreshold) / (highThreshold - desirableThreshold)) * sectionWidth;
-                          } else {
-                            pointerPosition = sectionWidth * 2 + ((Math.min(value, maxRange) - highThreshold) / (maxRange - highThreshold)) * sectionWidth;
-                          }
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  { text: String(desirableThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: String(highThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#FFC107" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#EF5350" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Desirable", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Border Line", fontSize: 9, color: "#FFC107", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "High", fontSize: 9, color: "#EF5350", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 10],
-            },
-          ]
-        : []),
-      // LDL Cholesterol Section - 4 zones: Optimal (Green), Near Optimal (Yellow), Slightly High (Light Green), High (Red)
-      ...(ldlCholesterol.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("cholesterol.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Low-density lipoprotein (LDL) cholesterol",
-                              fontSize: 10,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "50%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        {
-                          text: ldlCholesterol.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "20%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        {
-                          text: ldlCholesterol.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "25%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        ldlCholesterol.status === "Optimal"
-                          ? "#C8E6C9"
-                          : ldlCholesterol.status === "Near Optimal"
-                          ? "#FFC107"
-                          : ldlCholesterol.status === "Slightly High"
-                          ? "#A5D6A7"
-                          : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  [
-                    {
-                      stack: [
-                        {
-                          text: ldlCholesterolDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        (() => {
-                          const value = parseFloat(ldlCholesterol.value) || 100;
-                          const barWidth = 520;
-                          const optimalThreshold = 100;
-                          const nearOptimalThreshold = 129;
-                          const slightlyHighThreshold = 159;
-                          const maxRange = 200;
-                          const sectionWidth = barWidth / 4;
-
-                          let pointerPosition;
-                          if (value <= optimalThreshold) {
-                            pointerPosition = (value / optimalThreshold) * sectionWidth;
-                          } else if (value <= nearOptimalThreshold) {
-                            pointerPosition = sectionWidth + ((value - optimalThreshold) / (nearOptimalThreshold - optimalThreshold)) * sectionWidth;
-                          } else if (value <= slightlyHighThreshold) {
-                            pointerPosition = sectionWidth * 2 + ((value - nearOptimalThreshold) / (slightlyHighThreshold - nearOptimalThreshold)) * sectionWidth;
-                          } else {
-                            pointerPosition = sectionWidth * 3 + ((Math.min(value, maxRange) - slightlyHighThreshold) / (maxRange - slightlyHighThreshold)) * sectionWidth;
-                          }
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  { text: String(optimalThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: String(nearOptimalThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: String(slightlyHighThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#FFC107" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#A5D6A7" },
-                                  { type: "rect", x: sectionWidth * 3, y: 0, w: sectionWidth, h: 14, color: "#EF5350" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Optimal", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Near Optimal", fontSize: 9, color: "#FFC107", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Slightly High", fontSize: 9, color: "#A5D6A7", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "High", fontSize: 9, color: "#EF5350", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 10],
-            },
-          ]
-        : []),
-      // Total CHOL / HDL Cholesterol Ratio Section - 3 zones: Low (Blue), Normal (Green), High (Red)
-      ...(cholesterolRatio.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("cholesterol.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Total CHOL / HDL Cholesterol Ratio",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        {
-                          text: cholesterolRatio.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        {
-                          text: cholesterolRatio.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "25%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        cholesterolRatio.status === "Low"
-                          ? "#BBDEFB"
-                          : cholesterolRatio.status === "Normal"
-                          ? "#C8E6C9"
-                          : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  [
-                    {
-                      stack: [
-                        {
-                          text: cholesterolRatioDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        (() => {
-                          const value = parseFloat(cholesterolRatio.value) || 3.0;
-                          const barWidth = 520;
-                          const lowThreshold = 3.3;
-                          const normalThreshold = 4.4;
-                          const maxRange = 6.0;
-                          const sectionWidth = barWidth / 3;
-
-                          let pointerPosition;
-                          if (value <= lowThreshold) {
-                            pointerPosition = (value / lowThreshold) * sectionWidth;
-                          } else if (value <= normalThreshold) {
-                            pointerPosition = sectionWidth + ((value - lowThreshold) / (normalThreshold - lowThreshold)) * sectionWidth;
-                          } else {
-                            pointerPosition = sectionWidth * 2 + ((Math.min(value, maxRange) - normalThreshold) / (maxRange - normalThreshold)) * sectionWidth;
-                          }
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  { text: String(lowThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: String(normalThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#2196F3" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#EF5350" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Low", fontSize: 9, color: "#2196F3", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Normal", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "High", fontSize: 9, color: "#EF5350", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 25, 25, 20],
-            },
-          ]
-        : []),
-      // HBA1C Section - 3 zones: Normal (Green), Pre-Diabetic (Yellow), Diabetic (Red)
-      ...(hba1c.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("glucose.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "HBA1C",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        {
-                          text: hba1c.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        {
-                          text: hba1c.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "25%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        hba1c.status === "Normal"
-                          ? "#C8E6C9"
-                          : hba1c.status === "Pre-Diabetic"
-                          ? "#FFC107"
-                          : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  [
-                    {
-                      stack: [
-                        {
-                          text: hba1cDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        // Separator line
-                        {
-                          canvas: [
-                            {
-                              type: "line",
-                              x1: 0,
-                              y1: 0,
-                              x2: 520,
-                              y2: 0,
-                              lineWidth: 1,
-                              lineColor: "#E0E0E0",
-                            },
-                          ],
-                          margin: [10, 0, 10, 15],
-                        },
-                        (() => {
-                          const value = parseFloat(hba1c.value) || 5.0;
-                          const barWidth = 500;
-                          const normalThreshold = 5.7;
-                          const preDiabeticThreshold = 6.4;
-                          const maxRange = 10.0;
-                          const sectionWidth = barWidth / 3;
-
-                          let pointerPosition;
-                          if (value <= normalThreshold) {
-                            pointerPosition = (value / normalThreshold) * sectionWidth;
-                          } else if (value <= preDiabeticThreshold) {
-                            pointerPosition = sectionWidth + ((value - normalThreshold) / (preDiabeticThreshold - normalThreshold)) * sectionWidth;
-                          } else {
-                            pointerPosition = sectionWidth * 2 + ((Math.min(value, maxRange) - preDiabeticThreshold) / (maxRange - preDiabeticThreshold)) * sectionWidth;
-                          }
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  { text: String(normalThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: String(preDiabeticThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#FFC107" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#EF5350" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Normal", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Pre-Diabetic", fontSize: 9, color: "#FFC107", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Diabetic", fontSize: 9, color: "#EF5350", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 20],
-            },
-          ]
-        : []),
-      // Uric Acid Test Section - 3 zones: Low (Blue), Normal (Green), High (Red)
-      ...(uricAcid.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("glucose.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Uric Acid Test",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        {
-                          text: uricAcid.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        {
-                          text: uricAcid.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "25%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        uricAcid.status === "Normal"
-                          ? "#C8E6C9"
-                          : uricAcid.status === "Low"
-                          ? "#E3F2FD"
-                          : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  [
-                    {
-                      stack: [
-                        {
-                          text: uricAcidDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        {
-                          canvas: [
-                            { type: "line", x1: 0, y1: 0, x2: 520, y2: 0, lineWidth: 1, lineColor: "#E0E0E0" },
-                          ],
-                          margin: [10, 0, 10, 15],
-                        },
-                        (() => {
-                          const value = parseFloat(uricAcid.value) || 4.0;
-                          const barWidth = 500;
-                          const lowThreshold = 2.4;
-                          const normalThreshold = 6;
-                          const maxRange = 10;
-                          const sectionWidth = barWidth / 3;
-
-                          let pointerPosition;
-                          if (value <= lowThreshold) {
-                            pointerPosition = (value / lowThreshold) * sectionWidth;
-                          } else if (value <= normalThreshold) {
-                            pointerPosition = sectionWidth + ((value - lowThreshold) / (normalThreshold - lowThreshold)) * sectionWidth;
-                          } else {
-                            pointerPosition = sectionWidth * 2 + ((Math.min(value, maxRange) - normalThreshold) / (maxRange - normalThreshold)) * sectionWidth;
-                          }
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  { text: String(lowThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: String(normalThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#2196F3" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#EF5350" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Low", fontSize: 9, color: "#2196F3", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Normal", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "High", fontSize: 9, color: "#EF5350", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 10],
-            },
-          ]
-        : []),
-      // Color Vision Section - Simple card with status display
+      // Color Vision
       ...(colorVision.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("eye.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Color Vision",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "*",
-                          margin: [10, 10, 0, 0],
-                        },
-                      ],
-                      fillColor: "#C8E6C9",
-                      margin: [0, 0, 0, 0],
-                    },
+        ? [{
+            table: {
+              widths: ["*"],
+              body: [
+                [{
+                  columns: [{
+                    columns: [
+                      { image: getImagePath("eye.png"), width: 28, height: 28 },
+                      { text: "Color Vision", fontSize: 11, color: "#333", margin: [8, 6, 0, 0] },
+                    ],
+                    width: "*",
+                    margin: [10, 10, 0, 0],
+                  }],
+                  fillColor: "#C8E6C9",
+                  margin: [0, 0, 0, 0],
+                }],
+                [{
+                  stack: [
+                    { text: "You Might Have", fontSize: 11, color: "#555", alignment: "center", margin: [0, 30, 0, 10] },
+                    { text: colorVision.value || "Normal Vision", fontSize: 24, bold: true, color: "#333", alignment: "center", margin: [0, 0, 0, 40] },
                   ],
-                  [
-                    {
-                      stack: [
-                        {
-                          text: "You Might Have",
-                          fontSize: 11,
-                          color: "#555",
-                          alignment: "center",
-                          margin: [0, 30, 0, 10],
-                        },
-                        {
-                          text: colorVision.value || "Normal Vision",
-                          fontSize: 24,
-                          bold: true,
-                          color: "#333",
-                          alignment: "center",
-                          margin: [0, 0, 0, 40],
-                        },
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 10],
+                  fillColor: "#F5F5F5",
+                }],
+              ],
             },
-          ]
+            layout: noLineLayout,
+            margin: [25, 10, 25, 10],
+          }]
         : []),
-      // Perceived Stress Scale (PSS) Section - 3 zones: Normal (Green), Moderate (Yellow), Severe (Red)
-      ...(perceivedStress.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("glucose.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Perceived Stress Scale (PSS)",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        {
-                          text: perceivedStress.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        {
-                          text: perceivedStress.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "25%",
-                          margin: [0, 16, 10, 0],
-                        },
-                      ],
-                      fillColor:
-                        perceivedStress.status === "Normal"
-                          ? "#C8E6C9"
-                          : perceivedStress.status === "Moderate"
-                          ? "#FFF9C4"
-                          : "#FFCDD2",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  [
-                    {
-                      stack: [
-                        {
-                          text: perceivedStressDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        {
-                          canvas: [
-                            { type: "line", x1: 0, y1: 0, x2: 520, y2: 0, lineWidth: 1, lineColor: "#E0E0E0" },
-                          ],
-                          margin: [10, 0, 10, 15],
-                        },
-                        (() => {
-                          const value = parseFloat(perceivedStress.value) || 10;
-                          const barWidth = 500;
-                          const normalThreshold = 13;
-                          const moderateThreshold = 26;
-                          const maxRange = 40;
-                          const sectionWidth = barWidth / 3;
 
-                          let pointerPosition;
-                          if (value <= normalThreshold) {
-                            pointerPosition = (value / normalThreshold) * sectionWidth;
-                          } else if (value <= moderateThreshold) {
-                            pointerPosition = sectionWidth + ((value - normalThreshold) / (moderateThreshold - normalThreshold)) * sectionWidth;
-                          } else {
-                            pointerPosition = sectionWidth * 2 + ((Math.min(value, maxRange) - moderateThreshold) / (maxRange - moderateThreshold)) * sectionWidth;
-                          }
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
+      // Perceived Stress Scale
+      ...createLipidCard({
+        icon: "glucose.png",
+        label: "Perceived Stress Scale (PSS)",
+        dataObj: perceivedStress,
+        description: perceivedStressDescription,
+        fillColorFn: (status) =>
+          status === "Normal" ? "#C8E6C9"
+          : status === "Moderate" ? "#FFF9C4"
+          : "#FFCDD2",
+        margin: [25, 10, 25, 20],
+        iconWidth: "45%",
+        valueWidth: "25%",
+        statusWidth: "25%",
+        statusBarFn: () => {
+          const bar = createThreeZoneBar({
+            value: perceivedStress.value, defaultValue: 10,
+            lowThreshold: 13, highThreshold: 26, maxRange: 40, barWidth: 500,
+            zones: [
+              { label: "Normal", color: "#4CAF50" },
+              { label: "Moderate", color: "#FFC107" },
+              { label: "Severe", color: "#C62828" },
+            ],
+            labelFontSize: 9,
+          });
+          bar.margin = [10, 0, 10, 15];
+          return bar;
+        },
+      }),
 
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  { text: String(normalThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: String(moderateThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#FFC107" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#C62828" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Normal", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Moderate", fontSize: 9, color: "#FFC107", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Severe", fontSize: 9, color: "#C62828", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 20],
-            },
-          ]
-        : []),
-      // Fatigue Assessment Scale (FAS) Section - 3 zones: Normal (Green), Moderate (Yellow), Severe (Red)
+      // Fatigue Assessment Scale
       ...(fatigueAssessment.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
+        ? [{
+            table: {
+              widths: ["*"],
+              body: [
+                [{
+                  columns: [
                     {
                       columns: [
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("glucose.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Fatigue Assessment Scale (FAS)",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "45%",
-                          margin: [10, 10, 0, 0],
-                        },
-                        {
-                          text: fatigueAssessment.value,
-                          fontSize: 13,
-                          bold: true,
-                          color: "#000",
-                          alignment: "center",
-                          width: "25%",
-                          margin: [0, 16, 0, 0],
-                        },
-                        {
-                          text: fatigueAssessment.status,
-                          fontSize: 11,
-                          bold: true,
-                          color: "#000",
-                          alignment: "right",
-                          width: "25%",
-                          margin: [0, 16, 10, 0],
-                        },
+                        { image: getImagePath("glucose.png"), width: 28, height: 28 },
+                        { text: "Fatigue Assessment Scale (FAS)", fontSize: 11, color: "#333", margin: [8, 6, 0, 0] },
                       ],
-                      fillColor: "#FFF9C4",
-                      margin: [0, 0, 0, 0],
+                      width: "45%",
+                      margin: [10, 10, 0, 0],
                     },
+                    { text: fatigueAssessment.value, fontSize: 13, bold: true, color: "#000", alignment: "center", width: "25%", margin: [0, 16, 0, 0] },
+                    { text: fatigueAssessment.status, fontSize: 11, bold: true, color: "#000", alignment: "right", width: "25%", margin: [0, 16, 10, 0] },
                   ],
-                  [
-                    {
-                      stack: [
-                        {
-                          text: fatigueAssessmentDescription,
-                          fontSize: 9,
-                          color: "#555",
-                          lineHeight: 1.5,
-                          margin: [10, 15, 10, 15],
-                        },
-                        {
-                          canvas: [
-                            { type: "line", x1: 0, y1: 0, x2: 520, y2: 0, lineWidth: 1, lineColor: "#E0E0E0" },
-                          ],
-                          margin: [10, 0, 10, 15],
-                        },
-                        (() => {
-                          const value = parseFloat(fatigueAssessment.value) || 20;
-                          const barWidth = 500;
-                          const normalThreshold = 22;
-                          const moderateThreshold = 34;
-                          const maxRange = 50;
-                          const sectionWidth = barWidth / 3;
-
-                          let pointerPosition;
-                          if (value <= normalThreshold) {
-                            pointerPosition = (value / normalThreshold) * sectionWidth;
-                          } else if (value <= moderateThreshold) {
-                            pointerPosition = sectionWidth + ((value - normalThreshold) / (moderateThreshold - normalThreshold)) * sectionWidth;
-                          } else {
-                            pointerPosition = sectionWidth * 2 + ((Math.min(value, maxRange) - moderateThreshold) / (maxRange - moderateThreshold)) * sectionWidth;
-                          }
-                          pointerPosition = Math.max(12, Math.min(barWidth - 12, pointerPosition));
-
-                          return {
-                            stack: [
-                              {
-                                columns: [
-                                  { text: String(normalThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: String(moderateThreshold), fontSize: 9, color: "#666", width: sectionWidth, alignment: "right", margin: [0, 0, -5, 4] },
-                                  { text: "", width: "*" },
-                                ],
-                              },
-                              {
-                                canvas: [
-                                  { type: "rect", x: 0, y: 0, w: sectionWidth, h: 14, color: "#4CAF50" },
-                                  { type: "rect", x: sectionWidth, y: 0, w: sectionWidth, h: 14, color: "#FFC107" },
-                                  { type: "rect", x: sectionWidth * 2, y: 0, w: sectionWidth, h: 14, color: "#C62828" },
-                                  { type: "ellipse", x: pointerPosition, y: 7, r1: 10, r2: 10, lineColor: "#424242", lineWidth: 2, color: "white" },
-                                ],
-                              },
-                              {
-                                columns: [
-                                  { text: "Normal", fontSize: 9, color: "#4CAF50", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Moderate", fontSize: 9, color: "#FFC107", italics: true, width: sectionWidth, alignment: "center", margin: [0, 6, 0, 0] },
-                                  { text: "Severe", fontSize: 9, color: "#C62828", italics: true, width: "*", alignment: "center", margin: [0, 6, 0, 0] },
-                                ],
-                              },
-                            ],
-                            margin: [10, 0, 10, 15],
-                          };
-                        })(),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
+                  fillColor: "#FFF9C4",
+                  margin: [0, 0, 0, 0],
+                }],
+                [{
+                  stack: [
+                    { text: fatigueAssessmentDescription, fontSize: 9, color: "#555", lineHeight: 1.5, margin: [10, 15, 10, 15] },
+                    { canvas: [{ type: "line", x1: 0, y1: 0, x2: 520, y2: 0, lineWidth: 1, lineColor: "#E0E0E0" }], margin: [10, 0, 10, 15] },
+                    (() => {
+                      const bar = createThreeZoneBar({
+                        value: fatigueAssessment.value, defaultValue: 20,
+                        lowThreshold: 22, highThreshold: 34, maxRange: 50, barWidth: 500,
+                        zones: [
+                          { label: "Normal", color: "#4CAF50" },
+                          { label: "Moderate", color: "#FFC107" },
+                          { label: "Severe", color: "#C62828" },
+                        ],
+                        labelFontSize: 9,
+                      });
+                      bar.margin = [10, 0, 10, 15];
+                      return bar;
+                    })(),
                   ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 10],
+                  fillColor: "#F5F5F5",
+                }],
+              ],
             },
-          ]
+            layout: noLineLayout,
+            margin: [25, 10, 25, 10],
+          }]
         : []),
-      // Tuberculosis Test Section - Simple card with Result and Recommendation
+
+      // Tuberculosis Test
       ...(tuberculosisTest.value
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
+        ? [{
+            table: {
+              widths: ["*"],
+              body: [
+                [{
+                  columns: [{
+                    columns: [
+                      { image: getImagePath("eye.png"), width: 28, height: 28 },
+                      { text: "Tuberculosis Test", fontSize: 11, color: "#333", margin: [8, 6, 0, 0] },
+                    ],
+                    width: "*",
+                    margin: [10, 10, 0, 0],
+                  }],
+                  fillColor: "#C8E6C9",
+                  margin: [0, 0, 0, 0],
+                }],
+                [{
+                  stack: [
                     {
                       columns: [
-                        // {
-                        //   canvas: [
-                        //     { type: "rect", x: 0, y: 0, w: 4, h: 48, color: "#FFC107" },
-                        //   ],
-                        //   width: 4,
-                        // },
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("eye.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Tuberculosis Test",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "*",
-                          margin: [10, 10, 0, 0],
-                        },
+                        { text: "Result :", fontSize: 14, bold: true, color: "#333", width: "auto" },
+                        { text: tuberculosisTest.value || "Negative", fontSize: 12, color: "#fff", background: "#607D8B", margin: [10, 2, 0, 0], width: "auto" },
                       ],
-                      fillColor: "#C8E6C9",
-                      margin: [0, 0, 0, 0],
+                      margin: [10, 20, 10, 15],
                     },
-                  ],
-                  [
                     {
-                      stack: [
-                        {
-                          columns: [
-                            {
-                              text: "Result :",
-                              fontSize: 14,
-                              bold: true,
-                              color: "#333",
-                              width: "auto",
-                            },
-                            {
-                              text: tuberculosisTest.value || "Negative",
-                              fontSize: 12,
-                              color: "#fff",
-                              background: "#607D8B",
-                              margin: [10, 2, 0, 0],
-                              width: "auto",
-                            },
-                          ],
-                          margin: [10, 20, 10, 15],
-                        },
-                        {
-                          columns: [
-                            {
-                              text: "Recommendation :",
-                              fontSize: 12,
-                              bold: true,
-                              color: "#333",
-                              width: "auto",
-                            },
-                            {
-                              text: "Continue to monitor your health. If you have any concerns or develop symptoms, consult a healthcare professional for further advice.",
-                              fontSize: 10,
-                              color: "#555",
-                              margin: [5, 0, 10, 0],
-                              width: "*",
-                            },
-                          ],
-                          margin: [10, 0, 10, 30],
-                        },
+                      columns: [
+                        { text: "Recommendation :", fontSize: 12, bold: true, color: "#333", width: "auto" },
+                        { text: "Continue to monitor your health. If you have any concerns or develop symptoms, consult a healthcare professional for further advice.", fontSize: 10, color: "#555", margin: [5, 0, 10, 0], width: "*" },
                       ],
-                      fillColor: "#F5F5F5",
+                      margin: [10, 0, 10, 30],
                     },
                   ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 10],
+                  fillColor: "#F5F5F5",
+                }],
+              ],
             },
-          ]
+            layout: noLineLayout,
+            margin: [25, 10, 25, 10],
+          }]
         : []),
-      // Mental Health Assessment Section - Card with Depression and Anxiety levels
+
+      // Mental Health Assessment
       ...((mentalHealth.depression || mentalHealth.anxiety)
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        // {
-                        //   canvas: [
-                        //     { type: "rect", x: 0, y: 0, w: 4, h: 48, color: "#EF5350" },
-                        //   ],
-                        //   width: 4,
-                        // },
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("eye.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Mental Health Assessment",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "*",
-                          margin: [10, 10, 0, 0],
-                        },
+        ? [{
+            table: {
+              widths: ["*"],
+              body: [
+                [{
+                  columns: [{
+                    columns: [
+                      { image: getImagePath("eye.png"), width: 28, height: 28 },
+                      { text: "Mental Health Assessment", fontSize: 11, color: "#333", margin: [8, 6, 0, 0] },
+                    ],
+                    width: "*",
+                    margin: [10, 10, 0, 0],
+                  }],
+                  fillColor: "#FFCDD2",
+                  margin: [0, 0, 0, 0],
+                }],
+                [{
+                  stack: [{
+                    table: {
+                      widths: ["auto", "auto"],
+                      body: [
+                        [
+                          { text: "Level of Depression", fontSize: 11, color: "#333", margin: [10, 10, 20, 10], border: [false, false, false, true] },
+                          { text: mentalHealth.depression || "Minimal", fontSize: 11, color: "#fff", fillColor: "#81C784", alignment: "center", margin: [15, 10, 15, 10], border: [false, false, false, true] },
+                        ],
+                        [
+                          { text: "Level of Anxiety", fontSize: 11, color: "#333", margin: [10, 10, 20, 10], border: [false, false, false, false] },
+                          { text: mentalHealth.anxiety || "Mild", fontSize: 11, color: "#fff", fillColor: "#EF9A9A", alignment: "center", margin: [15, 10, 15, 10], border: [false, false, false, false] },
+                        ],
                       ],
-                      fillColor: "#FFCDD2",
-                      margin: [0, 0, 0, 0],
                     },
-                  ],
-                  [
-                    {
-                      stack: [
-                        {
-                          table: {
-                            widths: ["auto", "auto"],
-                            body: [
-                              [
-                                {
-                                  text: "Level of Depression",
-                                  fontSize: 11,
-                                  color: "#333",
-                                  margin: [10, 10, 20, 10],
-                                  border: [false, false, false, true],
-                                },
-                                {
-                                  text: mentalHealth.depression || "Minimal",
-                                  fontSize: 11,
-                                  color: "#fff",
-                                  fillColor: "#81C784",
-                                  alignment: "center",
-                                  margin: [15, 10, 15, 10],
-                                  border: [false, false, false, true],
-                                },
-                              ],
-                              [
-                                {
-                                  text: "Level of Anxiety",
-                                  fontSize: 11,
-                                  color: "#333",
-                                  margin: [10, 10, 20, 10],
-                                  border: [false, false, false, false],
-                                },
-                                {
-                                  text: mentalHealth.anxiety || "Mild",
-                                  fontSize: 11,
-                                  color: "#fff",
-                                  fillColor: "#EF9A9A",
-                                  alignment: "center",
-                                  margin: [15, 10, 15, 10],
-                                  border: [false, false, false, false],
-                                },
-                              ],
-                            ],
-                          },
-                          layout: {
-                            hLineWidth: (i) => (i === 1 ? 1 : 0),
-                            vLineWidth: () => 0,
-                            hLineColor: () => "#E0E0E0",
-                          },
-                          alignment: "center",
-                          margin: [150, 30, 0, 40],
-                        },
-                      ],
-                      fillColor: "#F5F5F5",
+                    layout: {
+                      hLineWidth: (i) => (i === 1 ? 1 : 0),
+                      vLineWidth: () => 0,
+                      hLineColor: () => "#E0E0E0",
                     },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 20],
+                    alignment: "center",
+                    margin: [150, 30, 0, 40],
+                  }],
+                  fillColor: "#F5F5F5",
+                }],
+              ],
             },
-          ]
+            layout: noLineLayout,
+            margin: [25, 10, 25, 20],
+          }]
         : []),
-      // Ayurvedic Test Section - Simple card with Result display
+
+      // Ayurvedic Test
       ...(ayurvedicTest.result
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        // {
-                        //   canvas: [
-                        //     { type: "rect", x: 0, y: 0, w: 4, h: 48, color: "#4CAF50" },
-                        //   ],
-                        //   width: 4,
-                        // },
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("eye.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Ayurvedic Test",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "*",
-                          margin: [10, 10, 0, 0],
-                        },
-                      ],
-                      fillColor: "#C8E6C9",
-                      margin: [0, 0, 0, 0],
-                    },
-                  ],
-                  [
-                    {
-                      stack: [
-                        {
-                          columns: [
-                            {
-                              text: "Result :",
-                              fontSize: 14,
-                              bold: true,
-                              color: "#333",
-                              width: "auto",
-                              margin: [0, 0, 10, 0],
-                            },
-                            {
-                              text: ayurvedicTest.result,
-                              fontSize: 11,
-                              color: "#333",
-                              fillColor: "#C8E6C9",
-                              margin: [10, 3, 10, 3],
-                              width: "auto",
-                            },
-                          ],
-                          margin: [30, 40, 10, 50],
-                        },
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 10],
+        ? [{
+            table: {
+              widths: ["*"],
+              body: [
+                [{
+                  columns: [{
+                    columns: [
+                      { image: getImagePath("eye.png"), width: 28, height: 28 },
+                      { text: "Ayurvedic Test", fontSize: 11, color: "#333", margin: [8, 6, 0, 0] },
+                    ],
+                    width: "*",
+                    margin: [10, 10, 0, 0],
+                  }],
+                  fillColor: "#C8E6C9",
+                  margin: [0, 0, 0, 0],
+                }],
+                [{
+                  stack: [{
+                    columns: [
+                      { text: "Result :", fontSize: 14, bold: true, color: "#333", width: "auto", margin: [0, 0, 10, 0] },
+                      { text: ayurvedicTest.result, fontSize: 11, color: "#333", fillColor: "#C8E6C9", margin: [10, 3, 10, 3], width: "auto" },
+                    ],
+                    margin: [30, 40, 10, 50],
+                  }],
+                  fillColor: "#F5F5F5",
+                }],
+              ],
             },
-          ]
+            layout: noLineLayout,
+            margin: [25, 10, 25, 10],
+          }]
         : []),
-      // Spirometer Test Section - Card with diagnosis and parameter table
+
+      // Spirometer Test
       ...(spirometerTest.diagnosis
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
+        ? [{
+            table: {
+              widths: ["*"],
+              body: [
+                [{
+                  columns: [{
+                    columns: [
+                      { image: getImagePath("eye.png"), width: 28, height: 28 },
+                      { text: "Spirometer Test", fontSize: 11, color: "#333", margin: [8, 6, 0, 0] },
+                    ],
+                    width: "*",
+                    margin: [10, 10, 0, 0],
+                  }],
+                  fillColor: "#C8E6C9",
+                  margin: [0, 0, 0, 0],
+                }],
+                [{
+                  stack: [
                     {
                       columns: [
-                        // {
-                        //   canvas: [
-                        //     { type: "rect", x: 0, y: 0, w: 4, h: 48, color: "#4CAF50" },
-                        //   ],
-                        //   width: 4,
-                        // },
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("eye.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Spirometer Test",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "*",
-                          margin: [10, 10, 0, 0],
-                        },
+                        { text: "Suggested Diagnosis :", fontSize: 13, color: "#333", width: "auto", margin: [150, 0, 0, 0] },
+                        { text: spirometerTest.diagnosis, fontSize: 13, bold: true, color: "#333", margin: [-200, 0, 0, 0], width: "*" },
                       ],
-                      fillColor: "#C8E6C9",
-                      margin: [0, 0, 0, 0],
+                      alignment: "center",
+                      margin: [0, 25, 0, 20],
                     },
-                  ],
-                  [
                     {
-                      stack: [
-                        {
-                          columns: [
-                            {
-                              text: "Suggested Diagnosis :",
-                              fontSize: 13,
-                              color: "#333",
-                              width: "auto",
-                              margin: [150, 0, 0, 0],
-                            },
-                            {
-                              text: spirometerTest.diagnosis,
-                              fontSize: 13,
-                              bold: true,
-                              color: "#333",
-                              margin: [-200, 0, 0, 0],
-                              width: "*",
-                            },
+                      table: {
+                        headerRows: 1,
+                        widths: ["*", "*", "*", "*"],
+                        body: [
+                          [
+                            { text: "Parameter", fontSize: 10, bold: true, color: "#333", alignment: "center", margin: [0, 8, 0, 8] },
+                            { text: "Predictive %", fontSize: 10, bold: true, color: "#333", alignment: "center", margin: [0, 8, 0, 8] },
+                            { text: "Predictive Value", fontSize: 10, bold: true, color: "#333", alignment: "center", margin: [0, 8, 0, 8] },
+                            { text: "Measured Value", fontSize: 10, bold: true, color: "#333", alignment: "center", margin: [0, 8, 0, 8] },
                           ],
-                          alignment: "center",
-                          // justifyContent: "center",
-                          margin: [0, 25, 0, 20],
-                        },
-                        {
-                          table: {
-                            headerRows: 1,
-                            widths: ["*", "*", "*", "*"],
-                            body: [
-                              [
-                                { text: "Parameter", fontSize: 10, bold: true, color: "#333", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: "Predictive %", fontSize: 10, bold: true, color: "#333", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: "Predictive Value", fontSize: 10, bold: true, color: "#333", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: "Measured Value", fontSize: 10, bold: true, color: "#333", alignment: "center", margin: [0, 8, 0, 8] },
-                              ],
-                              [
-                                { text: "FVC", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.fvc?.predictivePercent || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.fvc?.predictiveValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.fvc?.measuredValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                              ],
-                              [
-                                { text: "PEF", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.pef?.predictivePercent || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.pef?.predictiveValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.pef?.measuredValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                              ],
-                              [
-                                { text: "FEV1", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.fev1?.predictivePercent || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.fev1?.predictiveValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.fev1?.measuredValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                              ],
-                              [
-                                { text: "FEV1/FVC", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.fev1Fvc?.predictivePercent || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.fev1Fvc?.predictiveValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                                { text: spirometerTest.fev1Fvc?.measuredValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
-                              ],
-                            ],
-                          },
-                          layout: {
-                            hLineWidth: (i, node) => (i === 0 || i === 1 || i === node.table.body.length ? 1 : 1),
-                            vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length ? 1 : 1),
-                            hLineColor: () => "#E0E0E0",
-                            vLineColor: () => "#E0E0E0",
-                          },
-                          margin: [20, 0, 20, 25],
-                        },
-                      ],
-                      fillColor: "#F5F5F5",
+                          ...["fvc", "pef", "fev1", "fev1Fvc"].map((key) => {
+                            const labels = { fvc: "FVC", pef: "PEF", fev1: "FEV1", fev1Fvc: "FEV1/FVC" };
+                            const d = spirometerTest[key] || {};
+                            return [
+                              { text: labels[key], fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
+                              { text: d.predictivePercent || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
+                              { text: d.predictiveValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
+                              { text: d.measuredValue || "", fontSize: 10, color: "#555", alignment: "center", margin: [0, 8, 0, 8] },
+                            ];
+                          }),
+                        ],
+                      },
+                      layout: {
+                        hLineWidth: (i, node) => (i === 0 || i === 1 || i === node.table.body.length ? 1 : 1),
+                        vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length ? 1 : 1),
+                        hLineColor: () => "#E0E0E0",
+                        vLineColor: () => "#E0E0E0",
+                      },
+                      margin: [20, 0, 20, 25],
                     },
                   ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 20],
+                  fillColor: "#F5F5F5",
+                }],
+              ],
             },
-          ]
+            layout: noLineLayout,
+            margin: [25, 10, 25, 20],
+          }]
         : []),
-      // Audiometry Section - Card with Left Ear and Right Ear graphs
+
+      // Audiometry
       ...((audiometry.leftEarGraph || audiometry.rightEarGraph)
-        ? [
-            {
-              table: {
-                widths: ["*"],
-                body: [
-                  [
-                    {
-                      columns: [
-                        {
-                          columns: [
-                            {
-                              image: getImagePath("eye.png"),
-                              width: 28,
-                              height: 28,
-                            },
-                            {
-                              text: "Audiometry",
-                              fontSize: 11,
-                              color: "#333",
-                              margin: [8, 6, 0, 0],
-                            },
-                          ],
-                          width: "*",
-                          margin: [10, 10, 0, 0],
-                        },
-                      ],
-                      fillColor: "#C8E6C9",
-                      margin: [0, 0, 0, 0],
-                    },
+        ? [{
+            table: {
+              widths: ["*"],
+              body: [
+                [{
+                  columns: [{
+                    columns: [
+                      { image: getImagePath("eye.png"), width: 28, height: 28 },
+                      { text: "Audiometry", fontSize: 11, color: "#333", margin: [8, 6, 0, 0] },
+                    ],
+                    width: "*",
+                    margin: [10, 10, 0, 0],
+                  }],
+                  fillColor: "#C8E6C9",
+                  margin: [0, 0, 0, 0],
+                }],
+                [{
+                  stack: [
+                    ...(audiometry.leftEarGraph
+                      ? [
+                          { image: audiometry.leftEarGraph, width: 500, alignment: "center", margin: [20, 20, 20, 5] },
+                          { text: "Left Ear", fontSize: 11, color: "#333", alignment: "center", margin: [0, 0, 0, 15] },
+                        ]
+                      : []),
+                    ...(audiometry.rightEarGraph
+                      ? [
+                          { image: audiometry.rightEarGraph, width: 500, alignment: "center", margin: [20, 10, 20, 5] },
+                          { text: "Right Ear", fontSize: 11, color: "#333", alignment: "center", margin: [0, 0, 0, 15] },
+                        ]
+                      : []),
                   ],
-                  [
-                    {
-                      stack: [
-                        // Left Ear Graph
-                        ...(audiometry.leftEarGraph
-                          ? [
-                              {
-                                image: audiometry.leftEarGraph,
-                                width: 500,
-                                alignment: "center",
-                                margin: [20, 20, 20, 5],
-                              },
-                              {
-                                text: "Left Ear",
-                                fontSize: 11,
-                                color: "#333",
-                                alignment: "center",
-                                margin: [0, 5, 0, 20],
-                              },
-                            ]
-                          : []),
-                        // Right Ear Graph
-                        ...(audiometry.rightEarGraph
-                          ? [
-                              {
-                                image: audiometry.rightEarGraph,
-                                width: 500,
-                                alignment: "center",
-                                margin: [20, 10, 20, 5],
-                              },
-                              {
-                                text: "Right Ear",
-                                fontSize: 11,
-                                color: "#333",
-                                alignment: "center",
-                                margin: [0, 5, 0, 20],
-                              },
-                            ]
-                          : []),
-                      ],
-                      fillColor: "#F5F5F5",
-                    },
-                  ],
-                ],
-              },
-              layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-              margin: [25, 10, 25, 20],
+                  fillColor: "#F5F5F5",
+                }],
+              ],
             },
-          ]
+            layout: noLineLayout,
+            margin: [25, 10, 25, 20],
+          }]
         : []),
       // Disclaimer Section
       {
